@@ -1,0 +1,13 @@
+[Unit]
+Description=Apply honeypot Docker egress firewall rules
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment=DOCKER_SUBNET=172.30.0.0/24
+ExecStart=/usr/local/sbin/honeypot-iptables-rules.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

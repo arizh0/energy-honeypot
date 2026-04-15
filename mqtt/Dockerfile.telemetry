@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+# Apply available OS security patches (fixes CVE-2026-28390 openssl)
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+# Upgrade pip toolchain to fix CVE-2026-24049 (wheel) and CVE-2026-23949 (jaraco.context)
+# hadolint ignore=DL3013
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir \
+       wheel==0.46.2 \
+       jaraco.context==6.1.0 \
+       paho-mqtt==1.6.1
+COPY telemetry_generator.py .
+USER nobody
+CMD ["python", "-u", "telemetry_generator.py"]

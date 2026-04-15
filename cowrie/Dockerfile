@@ -1,0 +1,1 @@
+FROM cowrie/cowrie@sha256:ef74a16b44aa3bcbc2aa1e1cf23879070c07b59bfe2d109a5eb1d3cadee55250

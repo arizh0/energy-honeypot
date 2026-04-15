@@ -1,0 +1,36 @@
+# Cowrie credential whitelist -- only these combos grant a shell session.
+# Format: username:uid:password  (uid is ignored by Cowrie, use 0)
+# Everything not listed here returns "Permission denied" like a real device.
+#
+# Sourced from real-world IoT/ICS default credential lists and breach datasets.
+# Keeping the list broad means most credential stuffers eventually succeed,
+# generating richer post-login command data.
+
+root:0:root
+root:0:toor
+root:0:123456
+root:0:12345
+root:0:password
+admin:0:admin
+admin:0:admin123
+admin:0:password
+admin:0:password123
+admin:0:1234
+admin:0:12345
+admin:0:123456
+admin:0:helio
+admin:0:helio123
+admin:0:solar
+admin:0:solar123
+admin:0:inverter
+admin:0:changeme
+admin:0:default
+helio:0:helio
+helio:0:helio123
+helio:0:admin
+user:0:user
+user:0:password
+guest:0:guest
+service:0:service
+pi:0:raspberry
+ubnt:0:ubnt

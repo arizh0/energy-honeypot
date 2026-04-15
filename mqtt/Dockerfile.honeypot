@@ -1,0 +1,8 @@
+FROM python:3.11-slim
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+# No pip installs needed — pure stdlib
+COPY mqtt_honeypot.py .
+USER nobody
+CMD ["python", "-u", "mqtt_honeypot.py"]

@@ -1,0 +1,29 @@
+# CVE-2026-23949: jaraco.context path traversal via malicious tar archives
+# Status: fixed in standalone jaraco.context 6.1.0 (we install that)
+# Remaining finding: vendored copy inside setuptools/_vendor/ which cannot be
+# upgraded independently. The container runs only telemetry_generator.py and
+# never processes external packages or tar archives at runtime.
+CVE-2026-23949
+
+# CVE-2026-24049: wheel privilege escalation via malicious wheel file
+# Status: fixed in standalone wheel 0.46.2 (we install that)
+# Remaining finding: vendored copy inside setuptools/_vendor/ which cannot be
+# upgraded independently. The container never installs packages at runtime.
+CVE-2026-24049
+
+# CVE-2025-69720: ncurses buffer overflow
+# Status: no fix available in Debian 13 as of project date
+# Not applicable: container runs a Python MQTT script with no terminal or ncurses interaction
+CVE-2025-69720
+
+# CVE-2026-29111: systemd IPC arbitrary code execution / DoS
+# Status: no fix available
+# Not applicable: container does not run systemd; libsystemd0/libudev1 are
+# transitive Debian base image dependencies with no execution path in this container
+CVE-2026-29111
+
+# CVE-2026-4878: libcap TOCTOU race in cap_set_file()
+# Status: no fixed Debian 13 package shown by Trivy
+# Not applicable: telemetry image runs a Python MQTT loop as nobody and does
+# not set file capabilities or process attacker-controlled local files.
+CVE-2026-4878

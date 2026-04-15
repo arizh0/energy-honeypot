@@ -1,0 +1,154 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /promtail-positions/positions.yml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Scrape Docker container logs.
+  # Each log file is JSON: {"log":"...","stream":"...","time":"...","attrs":{"tag":"<name>"}}
+  # We extract attrs.tag first (before docker: {} consumes the raw JSON) to get
+  # the human-readable container name set via the logging.options.tag in docker-compose.yml.
+  - job_name: docker
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: honeypot
+          __path__: /var/lib/docker/containers/**/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            attrs: attrs
+      - json:
+          expressions:
+            container: tag
+          source: attrs
+      - labels:
+          container:
+      - docker: {}
+      # Conpot-specific: extract protocol, HTTP method, and source IP as queryable
+      # fields. protocol/http_method become labels (low cardinality); src_ip stays
+      # as a structured field in the log line (queried via | json in LogQL).
+      - match:
+          selector: '{container="conpot"}'
+          stages:
+            - regex:
+                expression: 'New (?P<protocol>Modbus|http|s7comm) (connection|session)'
+            - regex:
+                expression: 'HTTP/[\d.]+ (?P<http_method>GET|POST|HEAD|PUT|DELETE|OPTIONS|PATCH)'
+            - regex:
+                expression: 'from (?P<src_ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
+            - labels:
+                protocol:
+                http_method:
+      # Flask honeypot: drop health-check requests (127.0.0.1 every 30s from both
+      # Flask's own healthcheck and nginx's healthcheck-via-proxy). Then mark
+      # credential attempts and label common crawler traffic.
+      - match:
+          selector: '{container="flask-honeypot"}'
+          stages:
+            - json:
+                expressions:
+                  event: event
+                  user_agent: user_agent
+                  is_operator: is_operator
+                  src_ip: src_ip
+            - drop:
+                source: src_ip
+                expression: "^127\\.0\\.0\\.1$"
+            - labels:
+                event:
+                is_operator:
+            - regex:
+                expression: '(?i)(?P<is_bot>GPTBot|Google-Extended|Amazonbot|PerplexityBot|Bytespider|SemrushBot|AhrefsBot|bingbot|Googlebot|YandexBot|DotBot|MJ12bot)'
+                source: user_agent
+            - template:
+                source: is_bot
+                template: '{{ if .Value }}true{{ end }}'
+            - labels:
+                is_bot:
+      # MQTT honeypot: extract event type so mqtt_connect_attempt can be filtered directly.
+      - match:
+          selector: '{container="mqtt-honeypot"}'
+          stages:
+            - json:
+                expressions:
+                  event: event
+            - labels:
+                event:
+      # nginx HTTPS proxy: extract tls_version so you can filter by protocol.
+      - match:
+          selector: '{container="nginx-proxy"}'
+          stages:
+            - json:
+                expressions:
+                  tls_version: tls_version
+            - labels:
+                tls_version:
+      # Modbus proxy: drop healthcheck noise (TCP probe from 127.0.0.1 every 30s),
+      # then label event type. src_ip stays as a JSON field (high cardinality).
+      - match:
+          selector: '{container="modbus-proxy"}'
+          stages:
+            - json:
+                expressions:
+                  event: event
+                  src_ip: src_ip
+            - drop:
+                source: src_ip
+                expression: "^127\\.0\\.0\\.1$"
+            - labels:
+                event:
+  # Cowrie JSON log — one structured event per line written by output_jsonlog.
+  # Cowrie's stdout uses Twisted's plain-text format (not JSON), so we cannot
+  # extract eventid from Docker container logs. Instead we read the dedicated
+  # JSON file that Cowrie writes to var/log/cowrie/cowrie.json.
+  - job_name: cowrie_json
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: honeypot
+          container: cowrie
+          __path__: /cowrie-logs/cowrie.json
+    pipeline_stages:
+      - json:
+          expressions:
+            eventid:  eventid
+            src_ip:   src_ip
+            username: username
+            protocol: protocol
+      # Drop Docker health-check connections (127.0.0.1 → port 2222/2223 every 30s).
+      # These are internal probes, not attacker traffic, and they pollute Loki.
+      - drop:
+          source: src_ip
+          expression: "^127\\.0\\.0\\.1$"
+      - labels:
+          eventid:
+          protocol:
+
+  # Scrape the structured connection log written by connection-logger.sh.
+  # Each line: {"timestamp":"...","event":"syn|fin|rst|other","src_ip":"...","src_port":N,
+  #             "dst_ip":"...","dst_port":N,"raw":"..."}.
+  # event and dst_port become labels (low cardinality); src_ip stays a JSON field
+  # so it can be queried with | json without creating a high-cardinality label stream.
+  - job_name: tcpdump
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: tcpdump
+          __path__: /var/log/honeypot-connections.log
+    pipeline_stages:
+      - json:
+          expressions:
+            event:    event
+            dst_port: dst_port
+      - labels:
+          event:
+          dst_port:

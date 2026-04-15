@@ -1,0 +1,453 @@
+volumes:
+  mosquitto-data:
+  mosquitto-log:
+  conpot-log:
+  cowrie-downloads:
+  cowrie-log:
+  loki-data:
+  grafana-data:
+  promtail-positions:
+
+networks:
+  # Honeypot-facing network — attacker traffic lands here.
+  # The DOCKER-USER iptables chain (applied by firewall/iptables-rules.sh) blocks
+  # outbound internet access for this subnet so compromised containers cannot
+  # reach back to attacker infrastructure.
+  honeypot:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+  # Monitoring-only network — Loki, Grafana, and Promtail.
+  # internal: true removes the default gateway so these containers have no
+  # internet route at all; they can only talk to each other on this subnet.
+  # Named volumes (cowrie-log) cross the boundary safely — volume mounts are
+  # filesystem, not network. Operators reach Grafana by SSH tunneling to its
+  # fixed monitoring-network IP, not by publishing a host port from this
+  # internal network.
+  monitoring:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.1.0/24
+
+services:
+  # MQTT Credential-Capturing Proxy (external-facing on 1883)
+  # Intercepts CONNECT packets to log client_id/username/password, then proxies to Mosquitto.
+  mqtt-honeypot:
+    build:
+      context: ./mqtt
+      dockerfile: Dockerfile.honeypot
+    container_name: mqtt-honeypot
+    ports:
+      - "1883:1883"
+    networks:
+      - honeypot
+    depends_on:
+      - mosquitto
+    environment:
+      - BROKER_HOST=mosquitto
+      - BROKER_PORT=1883
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.50"
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import socket; s=socket.socket(); s.connect(('127.0.0.1',1883)); s.close()\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "mqtt-honeypot"
+
+  # MQTT Broker — internal only, no longer exposed externally
+  mosquitto:
+    image: eclipse-mosquitto@sha256:5bfaa4de338df2ee62871846e458d79adb765f539eeb58e68369faef029f3e0c
+    container_name: mosquitto
+    networks:
+      - honeypot
+    volumes:
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h 127.0.0.1 -p 1883 -t healthcheck -m ping -q 0"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "mosquitto"
+
+  # Fake telemetry generator
+  telemetry:
+    build:
+      context: ./mqtt
+      dockerfile: Dockerfile.telemetry
+    container_name: telemetry-generator
+    networks:
+      - honeypot
+    depends_on:
+      - mosquitto
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+          cpus: "0.25"
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import socket; s=socket.socket(); s.connect(('mosquitto',1883)); s.close()\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+        tag: "telemetry"
+
+  # MQTT activity watcher — logs all publish/subscribe events for session analysis
+  mqtt-watcher:
+    build:
+      context: ./mqtt
+      dockerfile: Dockerfile.watcher
+    container_name: mqtt-watcher
+    networks:
+      - honeypot
+    depends_on:
+      - mosquitto
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+          cpus: "0.25"
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import socket; s=socket.socket(); s.connect(('mosquitto',1883)); s.close()\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "mqtt-watcher"
+
+  # Cowrie SSH/Telnet Honeypot — emulates an ARM embedded Linux device.
+  # Logs all credentials, commands, and file uploads as structured JSON.
+  # Port 22 → internal 2222 (SSH), port 23 → internal 2223 (Telnet).
+  # IMPORTANT: move real sshd to port 2222 on the VPS before deploying.
+  cowrie:
+    image: cowrie/cowrie@sha256:ef74a16b44aa3bcbc2aa1e1cf23879070c07b59bfe2d109a5eb1d3cadee55250
+    container_name: cowrie
+    ports:
+      - "22:2222"
+      - "23:2223"
+    networks:
+      - honeypot
+    volumes:
+      - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      - ./cowrie/userdb.txt:/cowrie/cowrie-git/etc/userdb.txt:ro
+      - ./cowrie/motd:/cowrie/cowrie-git/share/cowrie/txtcmds/etc/motd:ro
+      - ./cowrie/bash_history:/cowrie/cowrie-git/share/cowrie/honeyfs/root/.bash_history:ro
+      - /etc/ssh/moduli:/etc/ssh/moduli:ro
+      - cowrie-downloads:/cowrie/cowrie-git/var/lib/cowrie/downloads
+      - cowrie-log:/cowrie/cowrie-git/var/log/cowrie
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.75"
+    healthcheck:
+      # cowrie has no /bin/sh — use CMD (not CMD-SHELL) to call python3 directly
+      test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.connect(('127.0.0.1',2222)); s.close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "cowrie"
+
+  # Flask HTTP Honeypot — fake HelioControl web interface on port 80
+  # Logs all requests and credential attempts as structured JSON.
+  flask-honeypot:
+    build:
+      context: ./flask-fallback
+      dockerfile: Dockerfile
+    container_name: flask-honeypot
+    expose:
+      - "5000"
+    networks:
+      - honeypot
+    environment:
+      - OPERATOR_IPS=${OPERATOR_IPS:-}
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.50"
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "flask-honeypot"
+
+  # nginx TLS proxy — serves the Flask honeypot over HTTPS on port 443.
+  # Self-signed cert (generated at container startup by entrypoint.sh, not at build time).
+  # Logs TLS version + cipher to stdout.
+  nginx-proxy:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - honeypot
+    depends_on:
+      - flask-honeypot
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+          cpus: "0.25"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO/dev/null http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "nginx-proxy"
+
+  # Modbus FC43 proxy — intercepts Read Device Identification (FC43/MEI=0x0E)
+  # and synthesizes a proper Siemens S7-200 response. Conpot returns b'' for
+  # FC43 because it treats unit_id=0 as broadcast; empty response is a fingerprint.
+  # All other Modbus function codes are forwarded to Conpot unchanged.
+  modbus-proxy:
+    build:
+      context: ./modbus-proxy
+      dockerfile: Dockerfile
+    container_name: modbus-proxy
+    ports:
+      - "502:502"
+    networks:
+      - honeypot
+    depends_on:
+      conpot:
+        condition: service_healthy
+    environment:
+      - CONPOT_HOST=conpot
+      - CONPOT_PORT=5020
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+          cpus: "0.25"
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import socket; s=socket.socket(); s.connect(('127.0.0.1',502)); s.close()\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "modbus-proxy"
+
+  # Conpot ICS Honeypot — Modbus and S7Comm only (HTTP moved to flask-honeypot).
+  # Port 502 is now served by modbus-proxy (above) which forwards here on 5020.
+  conpot:
+    image: honeynet/conpot@sha256:cd93e88d9e44b020db691fc4c75cb29e76b5e90ddbc408aca26e6c78c5646976
+    container_name: conpot
+    ports:
+      - "102:10201"
+      - "47808:47808/udp"
+    networks:
+      - honeypot
+    volumes:
+      - conpot-log:/var/log/conpot
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import socket; s=socket.socket(); s.connect(('127.0.0.1',5020)); s.close()\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "conpot"
+
+  # Loki (Log Aggregation)
+  loki:
+    image: grafana/loki@sha256:4a825ed37cf574f9cfeda62bd50c00fa1020b0aca8202aaa42cd0c0e5bfe0f63
+    container_name: loki
+    networks:
+      monitoring:
+        ipv4_address: 172.30.1.2
+    volumes:
+      - ./logging/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.75"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO/dev/null http://127.0.0.1:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Promtail (Log Shipper)
+  # Reads Docker container logs and the cowrie-log volume via bind/volume mounts —
+  # no network connection to honeypot containers is needed.
+  promtail:
+    image: grafana/promtail@sha256:c46f3611eaaafcbc4a695200a9d57a1ebaa78d425590d73ee62d892a99c4455f
+    container_name: promtail
+    networks:
+      monitoring:
+        ipv4_address: 172.30.1.4
+    volumes:
+      - ./logging/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+      - cowrie-log:/cowrie-logs:ro
+      - promtail-positions:/promtail-positions
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
+    # promtail's image contains only the Go binary + GNU coreutils — no wget/curl/nc.
+    # restart: unless-stopped handles crashes; no health check is needed here.
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Grafana (Dashboards)
+  grafana:
+    image: grafana/grafana@sha256:1adbcc2df3866ff5ec1d836e9d2220c904c7f98901b918d3cc5e1118ab1af991
+    container_name: grafana
+    networks:
+      monitoring:
+        ipv4_address: 172.30.1.3
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD before deploying}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-provisioning:/etc/grafana/provisioning:ro
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO/dev/null http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    depends_on:
+      - loki
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

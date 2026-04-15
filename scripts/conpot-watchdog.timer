@@ -1,0 +1,14 @@
+[Unit]
+Description=Run Conpot watchdog periodically
+Requires=docker.service
+After=docker.service
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=conpot-watchdog.service
+
+[Install]
+WantedBy=timers.target

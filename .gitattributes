@@ -1,0 +1,10 @@
+# Force LF line endings for all text files in git storage and on checkout.
+# This prevents CRLF/LF noise in diffs when editing on Windows and deploying to Linux.
+* text=auto eol=lf
+
+# Explicitly binary — never touch line endings
+*.png binary
+*.jpg binary
+*.gz  binary
+*.pcap binary
+*.mmdb binary

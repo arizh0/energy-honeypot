@@ -1,0 +1,81 @@
+# Private notes and local metadata
+draft_info/
+.draft_info/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.ovpn
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# Terraform local state and overrides
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars
+*.tfvars.json
+
+# Python
+__pycache__/
+*.py[cod]
+.python-version
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Logs and raw capture data
+*.log
+logs/
+pcap/
+data/raw/
+captures/
+exports/
+
+# Local container and dashboard state
+grafana-data/
+loki-data/
+promtail-positions.yaml
+
+# Editor and OS noise
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+*.tfstate.backup
+.terraform/
+*.tfvars
+!example.tfvars
+__pycache__/
+*.pyc
+.env
+secrets/
+*.pcap
+*.pcap.gz
+raw_logs/
+# GeoIP databases — binary files, downloaded separately from maxmind.com
+geoip/*.mmdb
+
+# Enriched logs — contain raw IPs, never committed
+logs/enriched/

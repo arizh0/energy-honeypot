@@ -1,0 +1,16 @@
+uptime
+df -h
+free -m
+systemctl status helio-inverter.service
+cat /etc/helio/config.ini
+tail -100 /var/log/helio/inverter.log
+mosquitto_sub -h localhost -t helio/# -v
+modbus-cli 192.168.1.1 --read-holding-registers 0 20
+systemctl restart helio-inverter.service
+journalctl -u helio-inverter.service -n 50
+netstat -tlnp
+iptables -L -n
+cat /etc/passwd
+uname -a
+ls /home/
+exit
