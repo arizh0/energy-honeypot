@@ -27,3 +27,32 @@ CVE-2026-29111
 # Not applicable: telemetry image runs a Python MQTT loop as nobody and does
 # not set file capabilities or process attacker-controlled local files.
 CVE-2026-4878
+
+# CVE-2026-42496: perl Archive::Tar path traversal via crafted symlinks
+# Status: no fixed Debian 13 package shown by Trivy
+# Not applicable: Python service containers do not invoke Perl or extract
+# attacker-controlled tar archives at runtime.
+CVE-2026-42496
+
+# CVE-2026-8376: Perl heap buffer overflow while compiling crafted regex input
+# Status: no fixed Debian 13 package shown by Trivy
+# Not applicable: Python service containers do not invoke Perl at runtime.
+CVE-2026-8376
+
+# CVE-2026-42497: perl Archive::Tar hardlink extraction issue
+# Status: no fixed Debian 13 package shown by Trivy
+# Not applicable: Python service containers do not invoke Perl or extract
+# attacker-controlled tar archives at runtime.
+CVE-2026-42497
+
+# CVE-2026-48962: perl IO::Compress arbitrary code execution via output glob
+# Status: no fixed Debian 13 package shown by Trivy
+# Not applicable: Python service containers do not invoke Perl or compress
+# attacker-controlled files at runtime.
+CVE-2026-48962
+
+# CVE-2026-9538: perl Archive::Tar memory exhaustion via crafted archive
+# Status: no fixed Debian 13 package shown by Trivy
+# Not applicable: Python service containers do not invoke Perl or extract
+# attacker-controlled tar archives at runtime.
+CVE-2026-9538
