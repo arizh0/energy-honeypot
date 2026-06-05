@@ -6,6 +6,8 @@ It pretends to be a solar inverter deployment: SSH and Telnet land in Cowrie, HT
 
 Do not run this on a network you do not own. It is meant for a disposable VPS or a lab host where you are allowed to receive unsolicited traffic.
 
+<img src="docs/images/honeypot-architecture.jpg" alt="Energy honeypot architecture" width="100%">
+
 ## What Is Exposed
 
 | Port | Service |
@@ -20,6 +22,15 @@ Do not run this on a network you do not own. It is meant for a disposable VPS or
 | `47808/udp` | Conpot BACnet |
 
 Grafana, Loki, Promtail, Mosquitto, and the Flask app have no published host ports. Grafana is reached through an SSH tunnel to the monitoring network, not by opening `3000` on the VPS.
+
+## HelioControl UI
+
+<p>
+  <img src="docs/images/heliocontrol-login.png" alt="HelioControl login page" width="100%">
+</p>
+<p>
+  <img src="docs/images/heliocontrol-dashboard.png" alt="HelioControl dashboard" width="100%">
+</p>
 
 ## Before You Put It Online
 
