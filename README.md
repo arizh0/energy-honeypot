@@ -6,6 +6,13 @@ It pretends to be a solar inverter deployment: SSH and Telnet land in Cowrie, HT
 
 Do not run this on a network you do not own. It is meant for a disposable VPS or a lab host where you are allowed to receive unsolicited traffic.
 
+## Write-Up
+
+- Part 1: [Building a Fake Solar Plant for Cybersecurity Research](https://hackernoon.com/building-a-fake-solar-plant-for-cybersecurity-research)
+- Part 2: [Building a Fake Solar Plant for Cybersecurity Research: Part 2](https://hackernoon.com/building-a-fake-solar-plant-for-cybersecurity-research-part-2)
+
+## Architecture
+
 <img src="docs/images/honeypot-architecture.jpg" alt="Energy honeypot architecture" width="100%">
 
 ## What Is Exposed

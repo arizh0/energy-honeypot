@@ -51,6 +51,19 @@ CVE-2026-42497
 # attacker-controlled files at runtime.
 CVE-2026-48962
 
+# CVE-2026-48959: perl IO::Uncompress::Unzip CPU exhaustion via crafted input
+# Status: no fixed Debian 13 package shown by Trivy
+# Not applicable: Python service containers do not invoke Perl or decompress
+# attacker-controlled zip archives at runtime.
+CVE-2026-48959
+
+# CVE-2026-11822 / CVE-2026-11824: SQLite memory corruption issues
+# Status: no fixed Debian 13 package shown by Trivy
+# Not applicable: telemetry image does not use SQLite or process attacker-
+# controlled database files at runtime.
+CVE-2026-11822
+CVE-2026-11824
+
 # CVE-2026-9538: perl Archive::Tar memory exhaustion via crafted archive
 # Status: no fixed Debian 13 package shown by Trivy
 # Not applicable: Python service containers do not invoke Perl or extract
