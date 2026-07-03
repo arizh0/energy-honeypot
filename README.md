@@ -10,6 +10,8 @@ Do not run this on a network you do not own. It is meant for a disposable VPS or
 
 - Part 1: [Building a Fake Solar Plant for Cybersecurity Research](https://hackernoon.com/building-a-fake-solar-plant-for-cybersecurity-research)
 - Part 2: [Building a Fake Solar Plant for Cybersecurity Research: Part 2](https://hackernoon.com/building-a-fake-solar-plant-for-cybersecurity-research-part-2)
+- Part 3: [Building a Fake Solar Plant for Cybersecurity Research: Part 3](https://hackernoon.com/building-a-fake-solar-plant-for-cybersecurity-research-part-3)
+- Malware analysis: [Static Analysis of Linux Malware Captured by a Cowrie Honeypot](https://hackernoon.com/static-analysis-of-linux-malware-captured-by-a-cowrie-honeypot)
 
 ## Architecture
 

@@ -69,3 +69,15 @@ CVE-2026-11824
 # Not applicable: Python service containers do not invoke Perl or extract
 # attacker-controlled tar archives at runtime.
 CVE-2026-9538
+
+# CVE-2026-41992: GNU gzip buffer overflow in LZH decompression
+# Status: no fixed Debian 13 package shown by Trivy
+# Not applicable: telemetry image runs a Python MQTT loop and does not invoke
+# gzip or decompress attacker-controlled archives at runtime.
+CVE-2026-41992
+
+# CVE-2026-54369: libacl symlink traversal privilege escalation
+# Status: no fixed Debian 13 package shown by Trivy
+# Not applicable: telemetry image runs as nobody and does not manage ACLs or
+# process attacker-controlled local symlink paths.
+CVE-2026-54369
